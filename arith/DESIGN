@@ -1,0 +1,462 @@
+Emily Quigley & Sam Broner
+10/7/14
+
+DESIGN
+HW4 Integer & Logical Operations
+
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+I. Architecture of program
+II. Testing Plan
+III. Challenge problem
+IV. Information lost in program
+
+I. Design Checklist for Whole Programs: 40image and compress40
+-------------------------------------------------
+
+1. Problem: Compressing and decompressing given images
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+2. Example inputs: -c and a ppm formatted image file as file argument or from 
+                   stdin
+                   -d and a compressed binary image file as file argument or
+                   from stdin
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+3. Example outputs: compressed binary image to stdout
+                    ppm formatted image to stdout
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+4. Steps/Sub-problems:
+        1. Determine compression or decompression
+        2. For compression:
+                a. Reading in image
+                b  Trim dimensions to be even numbers
+                c. Use rgb_video component to convert 2x2 block's worth of 
+                   RGB values into component video space-compatible floating 
+                   point representations
+                d. Pack each 2x2 block in the image to a 32-bit word using
+                   Bitpack interface
+                e. Print to stdout
+        3. For decompression:
+                a. Read header of given compressed file
+                b. Allocate 2D pixel array for the given file
+                c. Create new PPM
+                d. Read in each 32-bit codeword, unpack values into local 
+                   variables (a, b, c, d, P(b), P(r)) using Bitpack interface
+                        - Convert P(b) and P(r) into floats
+                        - Convert a, b, c, d into Y1, Y2, Y3, Y4
+                e. Use rgb_video component to transform each pixel from 
+                   component video color space floating point representations 
+                   into RGB color space values
+                f. Print to stdout
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+5. Data in each subproblem:
+        1. Command line arguments
+        2. compress40 compression interface:
+                a. Pnm_ppm with dimension variables and 2d 2x2 blocked array to 
+                  hold pixels
+                b. (no extra data strcutures needed for this subproblem)
+                c. Pnm_rgb struct into component video pixels that hold Y,
+                   P(b), and P(r) info, which then are used to calculate the
+                   32-bit codeword
+                d. Bitpack module
+                e. Compressed binary image
+        3. compress40 decompression interface:
+                a. (no extra data structures for this subproblem)
+                b. UArray2b
+                c. Pnm_ppm
+                d. Bitpack module
+                e. Component video pixels that hold Y, P(b),
+                   and P(r) info into new Pnm_rgb struct
+                f. Decompressed ppm image
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+6. Code/algorithms within each subproblem:
+        1. Idiom for reading in from a file or stdin, 
+        2. For compression:
+                a. pnm.h for accessing image pixels, mapping to array in 2x2
+                   block order
+                b. For each dimension, if even, don't trim, else, trim by one
+                c. RGB values are used to calculate the video component pixel
+                   representations by the following formulas:
+                        y = 0.299 * r + 0.587 * g + 0.114 * b;
+                        pb = -0.168736 * r - 0.331264 * g + 0.5 * b;
+                        pr = 0.5 * r - 0.418688 * g - 0.081312 * b;
+                d. - Calculate average P(b) & P(r) of each block and find 
+                     indexes from arith40 table
+                   - Calculate a, b, c, d values from each
+                     pixel's y value of the video component pixel 
+                     representations
+                            a = (Y4 + Y3 + Y2 + Y1)/4.0
+                            b = (Y4 + Y3 − Y2 − Y1)/4.0
+                            c = (Y4 − Y3 + Y2 − Y1)/4.0
+                            d = (Y4 − Y3 − Y2 + Y1)/4.0
+                   - Push bit representations of each above calculation onto 
+                     the 32-bit codeword representing that block using Bitpack 
+                     module
+                e. fprint
+        3. For decompression:
+                a. Idiom for reading in from a file or stdin
+                b. memory allocation
+                c. Create Pnm_ppm struct, assign parameter values
+                d. - Use Bitpack module to access a, b, c, d, P(b), & P(r)
+                   - Use a, b, c, d to calculate each pixel's Y value within 
+                     block
+                        Y1 = a − b − c + d
+                        Y2 = a − b + c − d
+                        Y3 = a + b − c − d
+                        Y4 = a + b + c + d
+                   - Use the average P(b) and P(r) values to assign each pixel
+                     a P(b) and P(r)
+                e. Calculate each pixel's RGB values using the formulas:
+                        r = 1.0 * y + 0.0 * pb + 1.402 * pr;
+                        g = 1.0 * y - 0.344136 * pb - 0.714136 * pr;
+                        b = 1.0 * y + 1.772 * pb + 0.0 * pr;
+                f. Pnm_ppmwrite
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+7. Abstractions we will use:
+        compress40.h
+        bitpack.h
+        rgb_video.h
+        pnm.h
+        a2methods.h, which contains:
+                Hanson's UArray
+                Noah's UArray2
+                Our UArray2b
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+8. Design checklists for Bitpack module & rgb_video module are located below
+   this design checklist.
+
+   A design checklist for compress40 is not included. 40image is only used for
+   reading in files and flags. The rest of the logic happens in compress40.
+   Because of this, most of our "program" is in compress40.
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+9. Invariants:
+        - Invariant for conversion between RGB and Video component images
+          can be found in the design checklist for rgb_video module
+        - Invariant for bitpacking can be found in design checklist for Bitpack
+          module
+        - Every 2x2 block of an input PPM image array can be mapped to exactly
+          one element of a corresponding compressed 2D array of video component
+          formatted pixels and vice versa
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+10. Algorithm for image compression:
+        - Use pnm.h to read in image in PPM format
+        - Use rgb_video to convert PPM to video component color space format
+        - Use bitpack.h to pack each video component pixel into 32-bit codeword
+        - Print binary compressed image file
+    Algorithm for image decompression:
+        - Use bitpack.h to unpack each 32-bit codeword into pixels in video
+          component color space pixels
+        - Use rgb_video to convert video component color space formatted pixels
+          into Pnm_rgb structs with RGB values
+        - Use pnm.h to write image in PPM format to standard output
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+11. Components/Interfaces:
+        * pnm - see pnm.h for interface *
+        * a2methods suite will incorporate these components: *
+            * UArray2b - see UArray2b.h for interface *
+            * UArray2 - see UArray2.h for interface *
+        * rgb_video - see interface below *
+        *Bitpack - see interface below *
+        * compress40 PROGRAM INTERFACE*
+        
+        void compress40 (FILE * input);
+            - takes in an input file pointer
+            - reads in a PPM, writes the compressed image to stdout
+            - this is where we organize our flow of logic for compression
+
+        void decompress40(FILE * input);
+            - takes in an input file pointer
+            - reads in a compressed image, writes the decompressed image to 
+              stdout
+            - this is where we organize our flow of logic for decompression
+
+
+        void dimension_trimmer (Pnm_ppm input_img)
+            - checks if dimensions need to be trimmed
+            - trims if necessary by creating new pixel array within input_img
+
+        A2 block_conversion_to_video (Pnm_ppm input_uncompressed_img)
+            - calls rgb_video on each block
+            - returns 2D array of structs containing video component structs
+              that represent each block in the input image
+
+        A2 pack_blocks (A2 video_array)
+            - call default mapping function on the video component formatted
+              array and use Bitpack module to pack each element of each struct
+              into 1 32-bit codeword that will be in a new 2D array
+            - return this new compressed array
+
+        A2 unpack_blocks (A2 codeword_array)
+            - call default mapping function on each compressed element of
+              codeword array and use Bitpack module to convert each to a video
+              component formatted block struct
+
+        Pnm_ppm block_conversion_to_rgb (A2 input_compressed_img)
+            - calls rgb_video on each block
+            - returns Pnm_ppm with 2D array of Pnm_rgb structs
+
+        void print_compressed_image (A2 codeword_array)
+            - print width and height of original, uncompressed image file
+            - print every compressed element of codeword_array in row-major
+              order
+
+        void print_decompressed_image (Pnm_ppm decompressed_image)
+            - Print header of ppm image
+            - Pnm_ppmwrite the decompressed image
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+12. Architecture:
+        4 modules are used by the image40 program (Pnm.h, A2Methods, Bitpack
+        rgb_video, compress40.h):
+        
+
+        - compress40.h will perform most of the logic of the 40image program
+          as it will call all necessary functions to perform the desired 
+          compression  or decompression.
+        - Pm.h will be used to read in and print out images in PPM format
+        - A2 Methods will be used to store data found in PPM images and perform
+          actions on each element's data within the image
+        - rgb_video will be used to take an entire block of RGB formatted
+          pixels and convert it into video component formatted pixels and vice
+          versa
+        - Bitpack.h will be used to compress and decompress the values of video
+          component formatted pixels.
+
+        Our overall program will incorporate all of the above components in
+        order to go between PPM images and binary compressed images.
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+13. Tests:
+        - Tests for rgb_video module in component design below
+        - Tests for bitpack module in component design below
+        - Rectangular image
+        - Image with odd dimensions
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+14. Arguments to convince a skeptical audience:
+        In order to prove that our program works, we can compress an original
+        image of size n and show that the compressed size is approximately
+        1/12n. This will prove that our invariant for compressing images holds
+        since each 2x2 block in the original image now occupies 1/12 the size
+        in our compressed file. Then, to prove that the image remained almost
+        completely unchanged and the invariant for decompression of image files
+        holds, we can decompress the file we just compressed and see that the
+        size of the decompressed image is approximately 12x the size of the 
+        compressed file and exactly n. 
+
+Interface Design of:
+rgb_video Module
+---------------------
+
+- Our public functions include:
+        struct video_pix rgb_to_video 
+        (Pnm_rgb p1, Pnm_rgb p2, Pnm_rgb p3, Pnm_rgb p4)
+                Takes in 4 Pnm_rgb structs with R, G, & B values and converts
+                them into one video_pix struct with a, b, c, d, avg P(b), & 
+                avg P(r) values
+
+        struct four_Pnm_rgb video_to_rgb (struct video_pix)
+                Takes in one video_pix struct with a, b, c, d, avg P(b), & 
+                avg P(r) values and converts it into a struct with 4 Pnm_rgb
+                pixels with R, G, & B values
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+- Examples of functions:
+        struct video_pix video1 = rgb_to_video (p1, p2, p3, p4);
+
+        four_Pnm_rgb block1 = video_to_rgb(video 1);
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+- Invariants:
+        Every Pnm_rgb struct corresponds to the following component video
+        transformation:
+                    y = 0.299 * r + 0.587 * g + 0.114 * b;
+                    pb = -0.168736 * r - 0.331264 * g + 0.5 * b;
+                    pr = 0.5 * r - 0.418688 * g - 0.081312 * b;
+        Four of the above video component represented pixels can be combined
+        into one floating point representation using the following formulas:
+                    a = (Y4 + Y3 + Y2 + Y1)/4.0
+                    b = (Y4 + Y3 − Y2 − Y1)/4.0
+                    c = (Y4 − Y3 + Y2 − Y1)/4.0
+                    d = (Y4 − Y3 − Y2 + Y1)/4.0
+        Alternatively, a floating point representation can be used to find
+        the video component of the corresponding 4 pixels with the folllowing
+        formulas:
+                    Y1 = a − b − c + d
+                    Y2 = a − b + c − d
+                    Y3 = a + b − c − d
+                    Y4 = a + b + c + d
+        Every component video struct corresponds to the following RGB
+        transformation:          
+                    r = 1.0 * y + 0.0 * pb + 1.402 * pr;
+                    g = 1.0 * y - 0.344136 * pb - 0.714136 * pr;
+                    b = 1.0 * y + 1.772 * pb + 0.0 * pr;    
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+- Test cases can include (and are not limited to):
+        - Correct input/output for normal rgb_to_video & video_to_rgb
+        - Partially made structs as input
+            - Some rgb pixels are present
+            - Rgb pixels only have 1 or 2 colors present
+            - Not all Y values accounted for
+            - No P(b) or no P(r) present
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+Interface Design of:
+bitpack Module
+---------------------
+
+- Our functions include:
+
+        bool Bitpack_fitsu(uint64_t n, unsigned width)
+                Takes in a 64-bit unsigned integer n and an unsigned integer
+                width and returns whether n can be represented in width bits
+                Contracts: n & width are integers (CRE for either to be a
+                decimal number)
+        bool Bitpack_fitss(int64_t n, unsigned width)
+                Takes in a 64-bit signed integer n and an unsigned integer
+                width and returns whether n can be represented in width bits
+                Contracts: n & width are integers (CRE for either to be a
+                decimal number)
+        uint64_t Bitpack_getu(uint64_t word, unsigned width, unsigned lsb)
+                Takes in a 64-bit unsigned integer codeword, an unsigned
+                integer width, and an unsigned integer lsb (least-significant-
+                bit) and returns a 64-bit unsigned integer within the
+                codeword beginning at the lsb with length width
+                Contracts: all parameters are integers (else CRE), width > 0
+        int64_t Bitpack_gets(uint64_t word, unsigned width, unsigned lsb)
+                Takes in a 64-bit unsigned integer codeword, an unsigned
+                integer width, and an unsigned integer lsb (least-significant-
+                bit) and returns a 64-bit signed integer within the
+                codeword beginning at the lsb with length width
+                Contracts: all parameters are integers (else CRE), width > 0
+        uint64_t Bitpack_newu(uint64_t word, unsigned width, unsigned lsb, 
+                              uint64_t value)
+                Takes in a 64-bit unsigned integer codeword, an unsigned int
+                width of the word we will be adding to the codeword, an
+                unsigned int lsb of where the new word belongs in the codeword,
+                and a 64-bit unsigned integer new word to be packed into the 
+                given codeword. Returns the updated codeword.
+                Contract: CRE if 0 < w< 64 or w + lsb <= 64
+        uint64_t Bitpack_news(uint64_t word, unsigned width, unsigned lsb,  
+                              int64_t value)
+                Takes in a 64-bit unsigned integer codeword, an unsigned int
+                width of the word we will be adding to the codeword, an
+                unsigned int lsb of where the new word belongs in the codeword,
+                and a 64-bit integer new word to be packed into the 
+                given codeword. Returns the updated codeword.
+                Contract: CRE if 0 < w < 64 or w + lsb <= 64
+        extern Except_T Bitpack_Overflow
+                Raised when a given value to either new function does not fit
+                into the given width bits (signed or unsigned depending on
+                which function is raising the exception)
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+- Examples of functions:
+        Bitpack_fitsu(10, 4); // returns true
+        Bitpack_fitss(10, 4); // returns false
+        Bitpack_newu(0x101b, 3, 6, 0x5); // returns 0x10bb
+        Bitpack_news(0x101b, 3, 6, 0x5); // returns 0x10bb
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+- Invariants: 
+
+        For Bitpack_news and Bitpack_newu, the value will be packed into a
+        container codeword by masking it using two extra integers.
+
+        The first integer will be all 1's and then 0's from the lsb to the lsb
+        plus the width. We will apply a logical and to this mask and the 
+        codeword and assign the result back to the codeword. This will 
+        "clear out" the bits in the location we are trying to use.
+
+        The second integer will be all zeros except it will contain the bit 
+        representation of the value to be packed from the lsb to the lsb
+        plus the width. We can then use logical "or" operator on the second 
+        integer and the codeword to assign the value to the proper location 
+        in the codeword.
+
+    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+
+- Test cases can include (and are not limited to):
+        - Correct input/output for packing signed & unsigned integers
+        - Packing a value whose size is greater than the width its is trying to
+          be packed into
+        - Packing the value 0
+        - Packing a value into width 0
+        - Packing a small number with a large width
+
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+II. Testing Plan
+----------------
+Testing for rgb_video module:
+        - Correct input/output for normal rgb_to_video & video_to_rgb
+        - Partially made structs as input
+            - Some rgb pixels are present
+            - Rgb pixels only have 1 or 2 colors present
+            - Not all Y values accounted for
+            - No P(b) or no P(r) present
+
+Testing for Bitpack module:
+        - Correct input/output for packing signed & unsigned integers
+        - Packing a value whose size is greater than the width its is trying to
+          be packed into
+        - Packing the value 0
+        - Packing a value into width 0
+        - Packing a small number with a large width
+
+Testing for image40 program:
+        - Rectangular image
+        - Image with odd dimensions
+
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+III. Challenge Problem Applicability in our Program Design
+----------------------------------------------------------
+By making an extremely modular solution, all of the logic pieces of our program 
+are very separate, so any change in the codeword will only need to be reflected
+in our image40 function that pushes information to the Bitpack module. We will
+implement a helper function in image40 that takes in values, their widths, and
+their lsbs and sends these to the Bitpacker with a corresponding desired
+codeword.
+
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+IV. Information Lost in Compression/Decompression of Images
+-------------------------------------------------------------
+Information can be lost, first of all, when the image is trimmed (if it needs
+to be trimmed) by one pixel in each odd dimension. Then, the average of a 2x2
+block of pixels' P(b) and P(r) values is taken for one pixel of the compressed
+file, so data is lost there. b, c, and d values in the conversion from RGB
+to component video blocks limit their values to between -0.3 and 0.3, which can
+cause a loss of exactness. Then, information is lost when quantizing these
+chroma values by finding the index whose range contains their value. In
+decompression, the calculations are for the most part true to the compressed
+data which has already lost information.

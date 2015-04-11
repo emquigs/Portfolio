@@ -1,0 +1,87 @@
+/*
+ *
+ * ppmdiff reads in two ppm images and compares them
+ *
+ *
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include "a2methods.h"
+#include "a2plain.h"
+#include "pnm.h"
+
+static A2Methods_T methods;
+typedef A2Methods_UArray2 A2;
+
+float calculate_diff (Pnm_ppm i1, Pnm_ppm i2);
+
+int main(int argc, char *argv[])
+{
+    Pnm_ppm img_1, img_2;
+    float diff;
+
+    methods = uarray2_methods_plain;
+
+    A2Methods_mapfun *map = methods->map_default;
+
+    if (argc < 2) {
+	fprintf(stderr, "Too few arguments\n");
+	exit(1);
+    } else if (argc == 3) {
+	img_1 = Pnm_ppmread(argv[1], methods);
+	img_2 = Pnm_ppmread(argv[2], methods);
+    } else if (argc ==2) {
+	img_1 = Pnm_ppmread(argv[1], methods);
+	img_2 = Pnm_ppmread(stdin, methods);
+    }
+
+    diff = calculate_diff(img_1, img_2, map);
+    printf("%5f\n", diff);
+
+    exit(0);
+}
+
+struct cl {
+    Pnm_ppm image;
+    long sum;
+};
+
+float calculate_diff (Pnm_ppm i1, Pnm_ppm i2, A2Methods_mapfun *map)
+{
+    unsigned w, h;
+    long sum;
+    double diff;
+
+    if(i1->width < i2->width) {
+	w = i1->width;
+    } else {
+	w = i2->width;
+    }
+
+    if(i1->height < i2->height) {
+	h = i1->height;
+    } else {
+	h = i2->height;
+    }
+
+    struct cl *my_cl = { i2->pixels, sum };
+    map(i1->pixels, pixel_diff, my_cl);
+
+    return (float)(sqrt(my_cl->sum/(3*w*h)));
+    
+}
+
+void pixel_diff(int i, int j, A2 a1, void *elem, void *cl)
+{
+    A2 a2;
+
+    a2 = (struct cl *)cl-> image;
+    
+    Pnm_rgb pixel2 = methods->at(a2, i, j);
+    Pnm_rgb pixel1 = (Pnm_rgb)elem;
+
+    (struct cl *)cl->sum = sum + (pixel1->red - pixel2->red)^2 + 
+	(pixel1->green - pixel2->green)^2 + (pixel1->blue - pixel2->blue)^2;
+}

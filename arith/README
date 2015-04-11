@@ -1,0 +1,68 @@
+Emily Quigley and Sam Broner
+
+10/14/2014
+
+We received help from the TA staff and Noah. In particular we recieved 
+excellent assistance from Todd and Margaret.
+
+As far as we know, all components of the assignment work as described in the
+assignment documentation.
+
+We have spent approximately 15 hours analyzing the problems posed in the
+assignment.
+We have spent approximately 25 hours solving the problem after our
+analysis. 
+
+
+Architecture:
+
+        Our program is split into 5 discrete modules. The 40image file is the 
+        “face” of our program, but compress40 handles and organizes the logical 
+        flow of our implementation. Within each module a datatype or dataformat 
+        (image with pixels in video component format, image with the discrete 
+        cosine transformed video pixels, etc) is changed and a process is 
+        performed. For each module, both the processes for compression and 
+        decompression of that datatype are performed.
+
+        Compress40 reads in images and then outsources logic to the following 
+        modules:
+
+                DCT_module
+                rgb_video
+                BitPack_Handler
+
+        bitpack is a fourth module and is called by BitPack_Handler.
+
+        rgb_video handles converting between the RGB format and the Video 
+        Component format as well as trimming files during compression. Although
+        this logic is not very complex, in our implementation requires two new 
+        A2s so it was moved to its own module.
+
+        DCT_module handles the conversion between blocks of 4 Video Component 
+        pixels and the structs containing the discrete cosine transformation
+        of those pixels. These elements are the chroma elements P(b) and P(r) 
+        and the cosine coefficients a, b, c, and d. Throughout our program we 
+        call this struct the small video struct
+
+        BitPack_Handler handles all of our bit pack related logic as well as 
+        global variables that define the makeup of the codeword. Bit pack logic 
+        is printing compressed elements and calling BitPack logic on structs of 
+        chroma elements P(b) and P(r) and the cosine coefficients a, b, c, and 
+        d to compress them into and decompress them from uint64_ts. 
+
+        bitpack is only called by BitPack_Handler and it contains the logic for 
+        manipulating bits in a word. This 
+        includes functions for getting bits, setting bits, and checking if a 
+        number will fit in a location.
+
+
+        There are also a number of structs that are passed around throughout 
+        this program’s implementation. Because these structs are not 
+        standardized here is an explanation of what each of them are:
+
+                Pnm_rgb is the struct used to hold the rgb values of every 
+                        pixel in a ppm image.
+                video_struct contains Y, P(b) and P(r) and is a transitional 
+                        unit that is used after the conversion from Pnm_rgb
+                Small_video_struct contains the results of the discrete cosine 
+                        transformation from a block of 4 video_struct pixels
